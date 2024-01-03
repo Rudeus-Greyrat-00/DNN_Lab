@@ -337,7 +337,7 @@ void FC_forward(DATA *input, DATA *output, int in_s, int out_s, int8_t *weights,
     int hkern = 0;
     int wkern = 0;
     long long int mac = 0; // 64 bits
-    DATA current = 0;
+    int8_t current = 0;
     /* foreach row in kernel */
     //	#pragma omp parallel for private (hkern, wkern, mac, current)
     for (hkern = 0; hkern < out_s; hkern++)
