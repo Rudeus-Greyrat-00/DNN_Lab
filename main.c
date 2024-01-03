@@ -13,7 +13,7 @@
 typedef uint8_t u8;
 
 // possible modes: 88, 17
-#define mode 17
+#define mode 88
 
 typedef short int DATA;
 
@@ -199,7 +199,7 @@ void print_data_toscrr(DATA *buffer, int size)
 {
     for (int i = 0; i < size; i++)
     {
-        printf("%d ", buffer[i]);
+        printf("%f ", FIXED2FLOAT(buffer[i],8));
     }
 }
 
@@ -215,7 +215,7 @@ void print_data_toscrr_int8(int8_t *buffer, int size)
 {
     for (int i = 0; i < size; i++)
     {
-        printf("%d ", buffer[i]);
+        printf("%f ", FIXED2FLOAT(buffer[i],8));
     }
 }
 
@@ -274,13 +274,15 @@ int main()
     if (read_bytes_from_path(gemm3_weights, "aes_mnist_assigment_groups/group_4/weights/Gemm3_weights.bin", n_weights3) < 0)
         return -1;
 
-    
+
 
 #if mode == 88
+    print_data("Bias of level 3", gemm3_bias, n_bias3);
     int qf_v = 8;
     for (int i = 0; i < 10; i++)
     {
         FC_forward(images[i], output_gemm0, img_size, n_bias0, gemm0_weights, gemm0_bias, qf_v);
+        print_data("Output gemm 0", output_gemm0, n_bias0);
         relu_forward(output_gemm0, input_gemm1, n_bias0);
         FC_forward(input_gemm1, output_gemm1, n_bias0, n_bias1, gemm1_weights, gemm1_bias, qf_v);
         relu_forward(output_gemm1, input_gemm2, n_bias1);
@@ -290,11 +292,14 @@ int main()
 
         resultsProcessing(output_gemm3, 10);
     }
+    print_data("Final output result: ", output_gemm3, n_bias3);
 #elif mode == 17
-    int qf_v = 7;
+    print_data_int8("Bias of level 3", gemm3_bias, n_bias3);
+    int qf_v = 8;
     for (int i = 0; i < 10; i++)
     {
         FC_forward(images[i], output_gemm0, img_size, n_bias0, gemm0_weights, gemm0_bias, qf_v);
+        print_data("Output gemm 0", output_gemm0, n_bias0);
         relu_forward(output_gemm0, input_gemm1, n_bias0);
         FC_forward(input_gemm1, output_gemm1, n_bias0, n_bias1, gemm1_weights, gemm1_bias, qf_v);
         relu_forward(output_gemm1, input_gemm2, n_bias1);
@@ -304,6 +309,7 @@ int main()
 
         resultsProcessing(output_gemm3, 10);
     }
+    print_data("Final output result: ", output_gemm3, n_bias3);
 #endif
 
     return 0;
@@ -323,12 +329,15 @@ void FC_forward(DATA *input, DATA *output, int in_s, int out_s, DATA *weights, D
     for (hkern = 0; hkern < out_s; hkern++)
     {
         mac = ((long long int)bias[hkern]) << qf;
+        //printf("\n\n\nMac = %lld", mac);
         for (wkern = 0; wkern < in_s; wkern++)
         {
             current = input[wkern];
             mac += current * weights[hkern * in_s + wkern]; // matrix, element in position hkern, wkern
+            printf("\nmac += current [%d] * weight [%d] ---> %lld", current, weights[hkern * in_s + wkern], mac);
         }
         output[hkern] = (DATA)saturate(mac >> qf);
+        printf("\nOutput[hkern] = %d ", output[hkern]);
     }
 }
 #elif mode == 17
@@ -337,18 +346,21 @@ void FC_forward(DATA *input, DATA *output, int in_s, int out_s, int8_t *weights,
     int hkern = 0;
     int wkern = 0;
     long long int mac = 0; // 64 bits
-    int8_t current = 0;
+    DATA current = 0;
     /* foreach row in kernel */
     //	#pragma omp parallel for private (hkern, wkern, mac, current)
     for (hkern = 0; hkern < out_s; hkern++)
     {
         mac = ((long long int)bias[hkern]) << qf;
+        //printf("\n\n\nMac = %lld", mac);
         for (wkern = 0; wkern < in_s; wkern++)
         {
             current = input[wkern];
             mac += current * weights[hkern * in_s + wkern]; // matrix, element in position hkern, wkern
+            printf("\nmac += current [%d] * weight [%d] ---> %lld", current, weights[hkern * in_s + wkern], mac);
         }
         output[hkern] = (DATA)saturate(mac >> qf);
+        printf("\nOutput[hkern] = %d ", output[hkern]);
     }
 }
 #endif
