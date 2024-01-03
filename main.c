@@ -24,8 +24,6 @@ typedef short int DATA;
 
 #define DEBUG_VERBOSE 0
 
-#define path "aes_mnist_assigment_groups/group_4/weights"
-
 #define img_width 28
 #define img_heigh 28
 #define img_size img_heigh *img_width
