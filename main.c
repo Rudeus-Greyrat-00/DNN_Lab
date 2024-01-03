@@ -331,7 +331,6 @@ void FC_forward(DATA *input, DATA *output, int in_s, int out_s, DATA *weights, D
         output[hkern] = (DATA)saturate(mac >> qf);
     }
 }
-
 #elif mode == 17
 void FC_forward(DATA *input, DATA *output, int in_s, int out_s, int8_t *weights, int8_t *bias, int qf)
 { // NOTE return W * x
@@ -349,7 +348,7 @@ void FC_forward(DATA *input, DATA *output, int in_s, int out_s, int8_t *weights,
             current = input[wkern];
             mac += current * weights[hkern * in_s + wkern]; // matrix, element in position hkern, wkern
         }
-        output[hkern] = (DATA)mac >> qf;
+        output[hkern] = (DATA)saturate(mac >> qf);
     }
 }
 #endif
