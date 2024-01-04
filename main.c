@@ -13,7 +13,7 @@
 typedef uint8_t u8;
 
 // possible modes: 88, 17
-#define mode 88
+#define mode 17
 
 typedef short int DATA;
 
@@ -21,6 +21,9 @@ typedef short int DATA;
 #define FLOAT2FIXED(a, qf) ((short int)round((a) * (1 << qf)))
 #define _MAX_ (1 << (sizeof(DATA) * 8 - 1)) - 1
 #define _MIN_ -(_MAX_ + 1)
+
+#define _MAXint8_ (1 << (sizeof(int8_t) * 8 - 1)) - 1
+#define _MINint8_ -(_MAXint8_ + 1)
 
 #define DEBUG_VERBOSE 0
 
@@ -72,6 +75,7 @@ void FC_forward(DATA *input, DATA *output, int in_s, int out_s, int8_t *weights,
 #endif
 int resultsProcessing(DATA *results, int size);
 static inline long long int saturate(long long int mac);
+static inline int8_t saturate_8bit(DATA value);
 
 uint64_t extract_bits(uint64_t source, int left_offset, int n_bits, bool shift_to_right)
 {
@@ -147,7 +151,7 @@ int read_int16_to_int8(int8_t *value, int fd)
                 return -1; // end of file reached
         }
     }
-    *value = data[0];
+    *value = saturate_8bit((DATA)(data[1] << 8) + data[0]);
     return 0;
 }
 #endif
@@ -197,7 +201,7 @@ void print_data_toscrr(DATA *buffer, int size)
 {
     for (int i = 0; i < size; i++)
     {
-        printf("%f ", FIXED2FLOAT(buffer[i],8));
+        printf("%d ", buffer[i]);
     }
 }
 
@@ -213,7 +217,7 @@ void print_data_toscrr_int8(int8_t *buffer, int size)
 {
     for (int i = 0; i < size; i++)
     {
-        printf("%f ", FIXED2FLOAT(buffer[i],8));
+        printf("%d ", buffer[i]);
     }
 }
 
@@ -272,6 +276,14 @@ int main()
     if (read_bytes_from_path(gemm3_weights, "aes_mnist_assigment_groups/group_4/weights/Gemm3_weights.bin", n_weights3) < 0)
         return -1;
 
+    /*
+    #if mode == 88
+    print_data("Weights", gemm0_weights, n_weights0);
+    #elif mode == 17
+    print_data_int8("Weights", gemm0_weights, n_weights0);
+    #endif
+    return 0;
+    */
 
 
 #if mode == 88
@@ -280,7 +292,7 @@ int main()
     for (int i = 0; i < 10; i++)
     {
         FC_forward(images[i], output_gemm0, img_size, n_bias0, gemm0_weights, gemm0_bias, qf_v);
-        print_data("Output gemm 0", output_gemm0, n_bias0);
+        //print_data("Output gemm 0", output_gemm0, n_bias0);
         relu_forward(output_gemm0, input_gemm1, n_bias0);
         FC_forward(input_gemm1, output_gemm1, n_bias0, n_bias1, gemm1_weights, gemm1_bias, qf_v);
         relu_forward(output_gemm1, input_gemm2, n_bias1);
@@ -290,14 +302,14 @@ int main()
 
         resultsProcessing(output_gemm3, 10);
     }
-    print_data("Final output result: ", output_gemm3, n_bias3);
+    //print_data("Final output result: ", output_gemm3, n_bias3);
 #elif mode == 17
     print_data_int8("Bias of level 3", gemm3_bias, n_bias3);
-    int qf_v = 8;
+    int qf_v = 7;
     for (int i = 0; i < 10; i++)
     {
         FC_forward(images[i], output_gemm0, img_size, n_bias0, gemm0_weights, gemm0_bias, qf_v);
-        print_data("Output gemm 0", output_gemm0, n_bias0);
+        //print_data("Output gemm 0", output_gemm0, n_bias0);
         relu_forward(output_gemm0, input_gemm1, n_bias0);
         FC_forward(input_gemm1, output_gemm1, n_bias0, n_bias1, gemm1_weights, gemm1_bias, qf_v);
         relu_forward(output_gemm1, input_gemm2, n_bias1);
@@ -307,7 +319,7 @@ int main()
 
         resultsProcessing(output_gemm3, 10);
     }
-    print_data("Final output result: ", output_gemm3, n_bias3);
+    //print_data("Final output result: ", output_gemm3, n_bias3);
 #endif
 
     return 0;
@@ -332,10 +344,10 @@ void FC_forward(DATA *input, DATA *output, int in_s, int out_s, DATA *weights, D
         {
             current = input[wkern];
             mac += current * weights[hkern * in_s + wkern]; // matrix, element in position hkern, wkern
-            printf("\nmac += current [%d] * weight [%d] ---> %lld", current, weights[hkern * in_s + wkern], mac);
+            //printf("\nmac += current [%d] * weight [%d] ---> %lld", current, weights[hkern * in_s + wkern], mac);
         }
         output[hkern] = (DATA)saturate(mac >> qf);
-        printf("\nOutput[hkern] = %d ", output[hkern]);
+        //printf("\nOutput[hkern] = %d ", output[hkern]);
     }
 }
 #elif mode == 17
@@ -355,10 +367,10 @@ void FC_forward(DATA *input, DATA *output, int in_s, int out_s, int8_t *weights,
         {
             current = input[wkern];
             mac += current * weights[hkern * in_s + wkern]; // matrix, element in position hkern, wkern
-            printf("\nmac += current [%d] * weight [%d] ---> %lld", current, weights[hkern * in_s + wkern], mac);
+            //printf("\nmac += current [%d] * weight [%d] ---> %lld", current, weights[hkern * in_s + wkern], mac);
         }
         output[hkern] = (DATA)saturate(mac >> qf);
-        printf("\nOutput[hkern] = %d ", output[hkern]);
+        //printf("\nOutput[hkern] = %d ", output[hkern]);
     }
 }
 #endif
@@ -457,3 +469,13 @@ static inline long long int saturate(long long int mac)
     } // printf("mac: %lld -> %llx _MAX_: %lld  _MIN_: %lld  res: %lld\n", mac, mac, _MAX_, _MIN_, mac);
     return mac;
 }
+
+static inline int8_t saturate_8bit(DATA value){
+    if(value > _MAXint8_){
+        return _MAXint8_;
+    }
+    if(value < _MINint8_){
+        return _MINint8_;
+    }
+    return value;
+} 
